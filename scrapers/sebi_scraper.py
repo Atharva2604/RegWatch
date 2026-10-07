@@ -8,14 +8,39 @@ load_dotenv()
 
 supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
-URL = "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0"
+try:
+    from scrapers.circular_fetcher import fetch_circular_text, get_hash
+except ModuleNotFoundError:
+    from circular_fetcher import fetch_circular_text, get_hash
 
-def scrape_sebi():
-    response = requests.get(URL, timeout=15)
+LEGAL_SOURCES = [
+    {
+        "legal_type": "circular",
+        "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0",
+    },
+    {
+        "legal_type": "regulation",
+        "url": "https://www.sebi.gov.in/sebi_data/commondocs/Regulations.html",
+    },
+    {
+        "legal_type": "act",
+        "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=1&smid=0",
+    },
+    {
+        "legal_type": "rule",
+        "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=2&smid=0",
+    },
+    {
+        "legal_type": "guideline",
+        "url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=5&smid=0",
+    }
+]
+
+def scrape_page(url):
+    response = requests.get(url, timeout=15)
     soup = BeautifulSoup(response.text, "html.parser")
-
-    rows = soup.select("table tr")  # we'll refine this selector once we see real output
-    circulars = []
+    rows = soup.select("table tr")
+    items = []
 
     for row in rows:
         cells = row.find_all("td")
@@ -27,56 +52,61 @@ def scrape_sebi():
             link = link_tag["href"] if link_tag else None
             if link and not link.startswith("http"):
                 link = "https://www.sebi.gov.in" + link
-            circulars.append({"date": date, "title": title, "link": link})
+            items.append({"date": date, "title": title, "link": link})
 
-    return circulars
+    return items
+
+def get_or_create_source(name, base_url, category_focus):
+    existing = supabase.table("sources").select("id").eq("name", name).execute()
+    if existing.data:
+        return existing.data[0]["id"]
+    inserted = supabase.table("sources").insert({
+        "name": name,
+        "base_url": base_url,
+        "category_focus": category_focus
+    }).execute()
+    return inserted.data[0]["id"]
 
 if __name__ == "__main__":
-    results = scrape_sebi()
-    print(f"Found {len(results)} rows")
+    source_id = get_or_create_source("SEBI", "https://www.sebi.gov.in", "cybersecurity_resilience")
 
-    # ensure a 'SEBI' source row exists
-    existing = supabase.table("sources").select("id").eq("name", "SEBI").execute()
-    if existing.data:
-        source_id = existing.data[0]["id"]
-    else:
-        inserted = supabase.table("sources").insert({
-            "name": "SEBI",
-            "base_url": URL,
-            "category_focus": "cybersecurity_resilience"
-        }).execute()
-        source_id = inserted.data[0]["id"]
-  
-    from scrapers.circular_fetcher import fetch_circular_text, get_hash
-    
-    for c in results:
-        try:
-            content_text = fetch_circular_text(c["link"])
-            content_hash = get_hash(content_text)
-        except Exception as e:
-            print(f"Failed to fetch content for {c['link']}: {e}")
-            continue
+    for source in LEGAL_SOURCES:
+        print(f"\n=== Scraping {source['legal_type']} ===")
+        results = scrape_page(source["url"])
+        print(f"Found {len(results)} rows")
 
-        existing_reg = supabase.table("regulations").select("id, content_hash").eq("url", c["link"]).execute()
-        if existing_reg.data:
-            old_hash = existing_reg.data[0].get("content_hash")
-            if old_hash != content_hash:
-                print(f"Hash changed for {c['title']}! Updating...")
-                supabase.table("regulations").update({"content_hash": content_hash}).eq("id", existing_reg.data[0]["id"]).execute()
-            continue
+        for c in results:
+            if not c["link"]:
+                continue
 
-        print(f"Inserting new circular: {c['title']}")
-        supabase.table("regulations").insert({
-            "source_id": source_id,
-            "title": c["title"],
-            "url": c["link"],
-            "content_hash": content_hash
-        }).execute()
+            try:
+                content_text = fetch_circular_text(c["link"])
+                content_hash = get_hash(content_text)
+            except Exception as e:
+                print(f"Failed to fetch content for {c['link']}: {e}")
+                continue
 
-    print("Done. New circulars inserted, duplicates skipped, and changes detected.")
-    
+            existing_reg = supabase.table("regulations").select("id, content_hash").eq("url", c["link"]).execute()
 
-import hashlib
+            if existing_reg.data:
+                old_hash = existing_reg.data[0].get("content_hash")
+                if old_hash != content_hash:
+                    print(f"Hash changed for {c['title']}! Updating...")
+                    supabase.table("regulations").update({
+                        "content_hash": content_hash,
+                        "content_text": content_text,
+                        "legal_type": source["legal_type"]
+                    }).eq("id", existing_reg.data[0]["id"]).execute()
+                continue
 
-def get_page_hash(html_text: str) -> str:
-    return hashlib.sha256(html_text.encode()).hexdigest()
+            print(f"Inserting new {source['legal_type']}: {c['title']}")
+            supabase.table("regulations").insert({
+                "source_id": source_id,
+                "title": c["title"],
+                "url": c["link"],
+                "content_hash": content_hash,
+                "content_text": content_text,  # Added the text here!
+                "legal_type": source["legal_type"]
+            }).execute()
+
+    print("\nDone. All legal sources scraped, duplicates skipped, changes detected.")
