@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regwatch"
+version = "0.1.0"
+description = "Autonomous regulatory intelligence & compliance monitoring engine"
+authors = [{ name = "RegWatch Engineering" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "supabase>=2.4.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "pymupdf>=1.24.0",
+    "groq>=0.9.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.1",
+    "typer>=0.12.0",
+    "tenacity>=8.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "import-linter>=2.0",
+]
+advanced = [
+    "sentence-transformers>=2.7.0",
+    "playwright>=1.44.0",
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "streamlit>=1.35.0",
+]
+
+[project.scripts]
+regwatch = "regwatch.interfaces.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --strict-markers"
+
+[tool.importlinter]
+root_package = "regwatch"
+
+[[tool.importlinter.contracts]]
+name = "Domain layer must not depend on outer layers"
+type = "forbidden"
+source_modules = ["regwatch.domain"]
+forbidden_modules = [
+    "regwatch.application",
+    "regwatch.infrastructure",
+    "regwatch.interfaces",
+    "regwatch.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application layer depends only on Domain"
+type = "forbidden"
+source_modules = ["regwatch.application"]
+forbidden_modules = [
+    "regwatch.infrastructure",
+    "regwatch.interfaces",
+    "regwatch.bootstrap",
+]

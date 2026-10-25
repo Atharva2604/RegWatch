@@ -88,7 +88,7 @@ Respond ONLY with a valid JSON object matching this schema, without markdown for
                         "content": prompt,
                     }
                 ],
-                model="llama3-8b-8192",
+                model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
                 response_format={"type": "json_object"}
             )
             
@@ -124,6 +124,10 @@ Respond ONLY with a valid JSON object matching this schema, without markdown for
                 
         except Exception as e:
             print(f"Error analyzing {reg['title']} with Groq: {e}")
+
+# Alias for main.py compatibility
+run_comparison_demo = run_real_comparison
+
 
 if __name__ == "__main__":
     if not os.getenv("GROQ_API_KEY"):

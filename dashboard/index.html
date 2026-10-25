@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RegWatch Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            background-image: radial-gradient(circle at top right, #1e3a8a 0%, transparent 40%),
+                radial-gradient(circle at bottom left, #312e81 0%, transparent 40%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+            color: var(--text-main);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        input,
+        select {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input {
+            flex-grow: 1;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        .table-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th,
+        td {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+
+        .badge.circular {
+            background: rgba(59, 130, 246, 0.2);
+            color: #93c5fd;
+        }
+
+        .badge.regulation {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+        }
+
+        .badge.act {
+            background: rgba(139, 92, 246, 0.2);
+            color: #c4b5fd;
+        }
+
+        .badge.rule {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+        }
+
+        .badge.guideline {
+            background: rgba(236, 72, 153, 0.2);
+            color: #f9a8d4;
+        }
+
+        .btn-view {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-view:hover {
+            background: var(--accent-hover);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Setup instructions styling */
+        #setup-box {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>RegWatch Dashboard</h1>
+            <div style="color: var(--text-muted)">Live Enterprise Regulatory Monitoring</div>
+        </header>
+
+        <div id="setup-box">
+            <h3>⚠️ Configuration Required</h3>
+            <p>Please open <code>dashboard/index.html</code> in your editor and add your <strong>SUPABASE_URL</strong>
+                and <strong>SUPABASE_KEY</strong> at line 230 to connect to your live database.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Documents</div>
+                <div class="stat-value" id="total-docs">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Sources Monitored</div>
+                <div class="stat-value">1</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Latest Update</div>
+                <div class="stat-value" id="latest-update" style="font-size: 1.2rem; line-height: 2.5rem;">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="searchInput" placeholder="Search regulations, acts, circulars by title..."
+                onkeyup="filterTable()">
+            <select id="typeFilter" onchange="filterTable()">
+                <option value="all">All Legal Types</option>
+                <option value="circular">Circulars</option>
+                <option value="regulation">Regulations</option>
+                <option value="act">Acts</option>
+                <option value="rule">Rules</option>
+                <option value="guideline">Guidelines</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table id="regTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="4" class="loading">Please configure your Supabase keys to load live data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🔴 ENTER YOUR SUPABASE CREDENTIALS HERE 🔴
+        // ==========================================
+        const SUPABASE_URL = 'https://rtiedpaxsrnmrmuyufwu.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0aWVkcGF4c3JubXJtdXl1Znd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzOTkzNDgsImV4cCI6MjEwNTk3NTM0OH0.lhAbC7iIyPiaaDH42NfIJ3VU-v1RjgwBm_09SrYZQsA';
+
+        let allRegulations = [];
+
+        async function init() {
+
+
+            document.getElementById('setup-box').style.display = 'none';
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="4" class="loading">Fetching live data from Supabase...</td></tr>';
+
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            // Fetch regulations
+            const { data, error } = await supabase
+                .from('regulations')
+                .select('*')
+                .order('id', { ascending: false });
+
+            if (error) {
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="4" style="color: #ef4444; padding: 2rem; text-align: center;">Error fetching data: ${error.message}</td></tr>`;
+                return;
+            }
+
+            allRegulations = data;
+
+            // Update stats
+            document.getElementById('total-docs').textContent = allRegulations.length;
+            if (allRegulations.length > 0 && allRegulations[0].effective_date) {
+                document.getElementById('latest-update').textContent = allRegulations[0].effective_date;
+            } else {
+                document.getElementById('latest-update').textContent = "Recently";
+            }
+
+            renderTable(allRegulations);
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="loading">No records found.</td></tr>';
+                return;
+            }
+
+            data.forEach(reg => {
+                const tr = document.createElement('tr');
+
+                // Format date safely
+                const displayDate = reg.effective_date ? reg.effective_date : 'N/A';
+
+                // Get type badge
+                const typeClass = reg.legal_type ? reg.legal_type.toLowerCase() : 'circular';
+
+                tr.innerHTML = `
+                    <td style="white-space: nowrap; color: var(--text-muted);">${displayDate}</td>
+                    <td><span class="badge ${typeClass}">${reg.legal_type || 'Unknown'}</span></td>
+                    <td style="font-weight: 500; line-height: 1.4;">${reg.title}</td>
+                    <td><a href="${reg.url}" target="_blank" class="btn-view">View Source</a></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const typeFilter = document.getElementById('typeFilter').value;
+
+            const filteredData = allRegulations.filter(reg => {
+                const matchesSearch = reg.title.toLowerCase().includes(searchTerm);
+                const matchesType = typeFilter === 'all' || (reg.legal_type && reg.legal_type.toLowerCase() === typeFilter);
+                return matchesSearch && matchesType;
+            });
+
+            renderTable(filteredData);
+        }
+
+        // Run when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+
+</html>

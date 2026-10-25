@@ -1,0 +1,63 @@
+key: sebi
+name: Securities and Exchange Board of India
+jurisdiction: IN
+base_url: https://www.sebi.gov.in
+allowed_domains:
+  - www.sebi.gov.in
+  - sebi.gov.in
+robots_respected: true
+rate_limit:
+  requests_per_second: 0.5
+  max_concurrency: 2
+enabled: true
+
+legal_type_map:
+  "Circular": circular
+  "Master Circular": master_circular
+  "Regulation": regulation
+  "Act": act
+  "Rule": rule
+  "Guideline": guideline
+  "General Order": general_order
+
+listings:
+  - name: circulars
+    legal_type: circular
+    url: https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=7&smid=0
+    parser: html_table
+    selectors:
+      row: "table tr"
+      date: "td:nth-child(1)"
+      title: "td:nth-child(2)"
+      link: "td:nth-child(2) a"
+    max_pages: 50
+
+  - name: master_circulars
+    legal_type: master_circular
+    url: https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=6&smid=0
+    parser: html_table
+    max_pages: 10
+
+  - name: regulations
+    legal_type: regulation
+    url: https://www.sebi.gov.in/sebi_data/commondocs/Regulations.html
+    parser: html_table
+    max_pages: 5
+
+  - name: acts
+    legal_type: act
+    url: https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=1&smid=0
+    parser: html_table
+    max_pages: 5
+
+  - name: rules
+    legal_type: rule
+    url: https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=2&smid=0
+    parser: html_table
+    max_pages: 5
+
+  - name: guidelines
+    legal_type: guideline
+    url: https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=5&smid=0
+    parser: html_table
+    max_pages: 5

@@ -1,0 +1,22 @@
+key: fake_regulator
+name: Fake Test Regulator Authority
+jurisdiction: TEST
+base_url: https://fake.regulator.test
+allowed_domains:
+  - fake.regulator.test
+robots_respected: true
+rate_limit:
+  requests_per_second: 10.0
+  max_concurrency: 5
+enabled: true
+
+legal_type_map:
+  "Advisory": circular
+  "Mandate": regulation
+
+listings:
+  - name: circulars
+    legal_type: circular
+    url: https://fake.regulator.test/advisories
+    parser: html_table
+    max_pages: 1

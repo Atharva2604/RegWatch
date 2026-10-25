@@ -37,6 +37,7 @@ LEGAL_SOURCES = [
 ]
 
 def scrape_page(url):
+    """Scrape a single page URL and return list of items."""
     response = requests.get(url, timeout=15)
     soup = BeautifulSoup(response.text, "html.parser")
     rows = soup.select("table tr")
@@ -56,6 +57,38 @@ def scrape_page(url):
 
     return items
 
+def scrape_all_pages(base_url, max_pages=50):
+    """
+    Scrapes all paginated pages of a SEBI listing URL.
+    SEBI uses &currPage=N for pagination.
+    Stops when a page returns no results or max_pages is reached.
+    """
+    all_items = []
+
+    for page_num in range(1, max_pages + 1):
+        # SEBI pagination: append &currPage=N (skip for page 1 — it's the default)
+        if page_num == 1:
+            url = base_url
+        else:
+            url = f"{base_url}&currPage={page_num}"
+
+        print(f"  Fetching page {page_num}: {url}")
+
+        try:
+            items = scrape_page(url)
+        except Exception as e:
+            print(f"  Error fetching page {page_num}: {e}")
+            break
+
+        if not items:
+            print(f"  No items found on page {page_num}. Stopping pagination.")
+            break
+
+        all_items.extend(items)
+        print(f"  Page {page_num}: found {len(items)} items (total so far: {len(all_items)})")
+
+    return all_items
+
 def get_or_create_source(name, base_url, category_focus):
     existing = supabase.table("sources").select("id").eq("name", name).execute()
     if existing.data:
@@ -67,16 +100,22 @@ def get_or_create_source(name, base_url, category_focus):
     }).execute()
     return inserted.data[0]["id"]
 
-if __name__ == "__main__":
+def fetch_sebi_circulars():
+    """Scrape all SEBI legal sources, detect changes by hash, upsert to Supabase."""
     source_id = get_or_create_source("SEBI", "https://www.sebi.gov.in", "cybersecurity_resilience")
 
     for source in LEGAL_SOURCES:
         print(f"\n=== Scraping {source['legal_type']} ===")
-        results = scrape_page(source["url"])
-        print(f"Found {len(results)} rows")
+        results = scrape_all_pages(source["url"], max_pages=50)
+        print(f"Found {len(results)} total rows across all pages")
 
         for c in results:
             if not c["link"]:
+                continue
+
+            existing_reg = supabase.table("regulations").select("id, content_hash").eq("url", c["link"]).execute()
+            if existing_reg.data and existing_reg.data[0].get("content_hash"):
+                # Already downloaded, hashed, and stored in Supabase!
                 continue
 
             try:
@@ -85,8 +124,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Failed to fetch content for {c['link']}: {e}")
                 continue
-
-            existing_reg = supabase.table("regulations").select("id, content_hash").eq("url", c["link"]).execute()
 
             if existing_reg.data:
                 old_hash = existing_reg.data[0].get("content_hash")
@@ -100,13 +137,28 @@ if __name__ == "__main__":
                 continue
 
             print(f"Inserting new {source['legal_type']}: {c['title']}")
+
+            # Fix date format for Postgres (it crashes if date is just "2015")
+            safe_date = c["date"]
+            if safe_date:
+                safe_date = safe_date.strip()
+                if len(safe_date) == 4 and safe_date.isdigit():  # e.g., "2015"
+                    safe_date = f"{safe_date}-01-01"
+            else:
+                safe_date = None
+
             supabase.table("regulations").insert({
                 "source_id": source_id,
                 "title": c["title"],
                 "url": c["link"],
                 "content_hash": content_hash,
-                "content_text": content_text,  # Added the text here!
-                "legal_type": source["legal_type"]
+                "content_text": content_text,
+                "legal_type": source["legal_type"],
+                "effective_date": safe_date
             }).execute()
 
     print("\nDone. All legal sources scraped, duplicates skipped, changes detected.")
+
+
+if __name__ == "__main__":
+    fetch_sebi_circulars()
