@@ -2,12 +2,16 @@
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 pymupdf>=1.24.0
+pytesseract>=0.3.10
+pillow>=10.0.0
+pyjwt>=2.8.0
 
 # Database & Storage
 supabase>=2.4.0
 
-# AI & LLM
+# AI & LLM & Embeddings
 groq>=0.9.0
+sentence-transformers>=3.0.0
 
 # Configuration, Validation & Data Modeling
 pydantic>=2.7.0
