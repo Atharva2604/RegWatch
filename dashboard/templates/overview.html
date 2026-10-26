@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% from "_macros.html" import verdict_chip, empty_state %}
+{% block title %}Overview · RegWatch{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Regulatory operations</p>
+  <h1>Overview</h1>
+  <p class="dek">A read-only view of the SEBI instruments RegWatch is tracking, the queue that processes them, and the compliance assessments stored in Supabase. Times are shown in IST.</p>
+</header>
+
+<section class="metrics" aria-label="Key figures">
+  <div class="metric">
+    <p class="metric-label">Documents tracked</p>
+    <p class="metric-value">{{ documents|num }}</p>
+    <p class="metric-note">Instruments in the regulations table</p>
+  </div>
+  <div class="metric">
+    <p class="metric-label">Snapshots stored</p>
+    <p class="metric-value">{{ snapshots|num }}</p>
+    <p class="metric-note">{{ with_snapshot|num }} documents have a stored version</p>
+  </div>
+  <div class="metric">
+    <p class="metric-label">Changes detected</p>
+    <p class="metric-value">{{ changes|num }}</p>
+    <p class="metric-note">{% if changes %}Documents with more than one version{% else %}No second version recorded yet{% endif %}</p>
+  </div>
+  <div class="metric border-none">
+    <p class="metric-label">Non-compliant findings</p>
+    <p class="metric-value">{{ verdict_counts['non_compliant']|num }}</p>
+    <p class="metric-note">Of {{ checks_total|num }} stored assessments</p>
+  </div>
+  <div class="metric border-none">
+    <p class="metric-label">Risk findings</p>
+    <p class="metric-value">{{ risk_total|num }}</p>
+    <p class="metric-note">
+      {% if recent_risks %}Latest is {{ level_labels.get(recent_risks[0].level, recent_risks[0].level)|lower }}{% else %}No scores recorded{% endif %}
+    </p>
+  </div>
+</section>
+
+<div class="grid grid-2" aria-label="Overview panels">
+  <div class="grid-main">
+    <div class="section">
+      <div class="section-head">
+        <h2>Recent snapshot activity</h2>
+        <a class="btn" href="/changes">Open change review</a>
+      </div>
+      <div class="panel">
+        <div class="panel-body">
+          {% if recent_versions %}
+          <div class="table-wrap">
+            <table>
+              <caption>The most recently captured document versions</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col" class="nowrap">Version</th>
+                  <th scope="col" class="nowrap">Regulator</th>
+                  <th scope="col" class="nowrap">Captured</th>
+                  <th scope="col" class="nowrap">Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for version in recent_versions %}
+                <tr>
+                  <td class="cell-title">
+                    <a href="/changes?regulation={{ version.regulation_id }}">{{ version.title }}</a>
+                  </td>
+                  <td class="nowrap mono">v{{ version.version_no }}</td>
+                  <td class="nowrap">{{ version.regulator }}</td>
+                  <td class="nowrap"><time datetime="{{ version.created_at }}">{{ version.created_at|dt }}</time></td>
+                  <td class="nowrap">
+                    {% if version.url %}
+                    <a class="source-link" href="{{ version.url }}" target="_blank" rel="noopener noreferrer">Source<span aria-hidden="true"> ↗</span></a>
+                    {% else %}—{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          {{ empty_state(
+            "No snapshots recorded yet",
+            "Run the ingestion and worker commands so the pipeline captures document content. The dashboard does not display placeholder activity.",
+            "/documents", "Browse documents"
+          ) }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Recent compliance assessments</h2>
+        <a class="btn" href="/compliance">All assessments</a>
+      </div>
+      <div class="panel">
+        <div class="panel-body">
+          {% if recent_checks %}
+          <div class="table-wrap">
+            <table>
+              <caption>The most recent compliance assessments</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Company</th>
+                  <th scope="col" class="nowrap">Verdict</th>
+                  <th scope="col" class="nowrap">Method</th>
+                  <th scope="col" class="nowrap">Recorded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for check in recent_checks %}
+                <tr>
+                  <td>{{ check.company_name }}</td>
+                  <td>{{ verdict_chip(check.verdict) }}</td>
+                  <td class="nowrap">{{ method_labels.get(check.method, check.method) }}</td>
+                  <td class="nowrap"><time datetime="{{ check.created_at }}">{{ check.created_at|dt }}</time></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          {{ empty_state(
+            "No compliance assessments stored",
+            "The compliance_checks table is empty. Assessments appear here only after the comparison pipeline writes them."
+          ) }}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="rail" aria-label="Operational status">
+    <div class="panel">
+      <div class="panel-body">
+        <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.14em; color:var(--muted); margin-bottom:10px;">Monitoring status</h2>
+        <dl class="facts">
+          <div>
+            <dt>Last document check</dt>
+            <dd>{{ last_checked_at|dt }}</dd>
+          </div>
+          <div>
+            <dt>Latest snapshot</dt>
+            <dd>{% if recent_versions %}{{ recent_versions[0].created_at|dt }}{% else %}—{% endif %}</dd>
+          </div>
+          <div>
+            <dt>Snapshot coverage</dt>
+            <dd>{{ with_snapshot|num }} / {{ documents|num }} documents</dd>
+          </div>
+          <div>
+            <dt>Ingestion runs logged</dt>
+            <dd>
+              {% if ingestion_runs is none %}Unavailable
+              {% else %}{{ ingestion_runs|num }}{% endif %}
+              {% if not ingestion_runs %}<span class="fact-note">No run log rows written yet</span>{% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt>Queue backlog</dt>
+            <dd>{{ jobs_pending|num }} pending{% if jobs_failed %} · <span class="text-alert">{{ jobs_failed|num }} failed</span>{% endif %}</dd>
+          </div>
+        </dl>
+        {% if jobs_failed %}
+        <p class="notice notice-warn" style="margin-top:10px;">Failed jobs are not retried by the dashboard. Inspect them with the worker/queue tooling before the demo.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <div class="panel-body">
+        <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.14em; color:var(--muted); margin-bottom:10px;">Assessment outcomes</h2>
+        {% if checks_total %}
+        <ul class="bar-list">
+          {% for key, label in verdict_labels.items() %}
+          <li>
+            <a class="bar-row" href="{{ verdict_links[key] }}">
+              <span class="bar-label">{{ label }}</span>
+              <span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--pct: {{ verdict_counts[key]|pct(checks_total) }}%"></span></span>
+              <span class="bar-count">{{ verdict_counts[key]|num }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color:var(--muted); font-size:12.5px;">No assessments have been stored yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <div class="panel-body">
+        <h2 style="font-size:11px; text-transform:uppercase; letter-spacing:0.14em; color:var(--muted); margin-bottom:10px;">Alert delivery</h2>
+        <dl class="facts">
+          <div>
+            <dt>Alerts in table</dt>
+            <dd>{{ alerts|num }}</dd>
+          </div>
+          <div>
+            <dt>Notifier</dt>
+            <dd>FakeNotifier</dd>
+          </div>
+          <div>
+            <dt>External channels</dt>
+            <dd class="text-alert">Not configured</dd>
+          </div>
+        </dl>
+        <p class="notice" style="margin-top:10px; font-size:12px;">Email and Telegram delivery are not implemented. Recorded alerts are not delivered by a real channel.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

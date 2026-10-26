@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · RegWatch{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <p class="eyebrow">Dashboard status</p>
+  <h1>{{ title }}</h1>
+  <p class="dek">The page could not be rendered from the configured data source.</p>
+</header>
+
+<section class="panel error-panel">
+  <p class="error-message">{{ message }}</p>
+  <p class="error-hint">{{ hint }}</p>
+  <div class="error-actions">
+    <a class="btn btn-primary" href="{{ request.url.path }}">Retry this page</a>
+    <a class="btn" href="/">Back to overview</a>
+  </div>
+  <p class="table-note">Verify the environment without exposing credentials:</p>
+  <pre class="code-block">python cli.py health</pre>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h2>What the dashboard assumes</h2></div>
+  <ul class="plain-list">
+    <li>Supabase is reachable and <span class="mono">SUPABASE_URL</span> / <span class="mono">SUPABASE_KEY</span> are set in the repository <span class="mono">.env</span>.</li>
+    <li>The read-only tables from migrations 001 and 002 exist.</li>
+    <li>The browser never receives the Supabase key; all queries run in this server process.</li>
+    <li>No demo or placeholder records are substituted when the database is unavailable.</li>
+  </ul>
+</section>
+{% endblock %}
