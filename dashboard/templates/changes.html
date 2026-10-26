@@ -1,169 +1,114 @@
 {% extends "base.html" %}
-{% from "_macros.html" import empty_state %}
-{% block title %}Change review · RegWatch{% endblock %}
+{% block title %}RegWatch — Changes{% endblock %}
 
 {% block content %}
-<header class="page-head">
-  <p class="eyebrow">Version history</p>
+<section class="page-head">
   <h1>Change review</h1>
-  <p class="dek">Stored content snapshots and the hashes used to detect revisions. RegWatch only reports a change when a document has more than one version; it never invents a change summary.</p>
-</header>
-
-<section class="metrics metrics-3" aria-label="Change figures">
-  <div class="metric">
-    <p class="metric-label">Changes detected</p>
-    <p class="metric-value">{{ changes|num }}</p>
-    <p class="metric-note">Documents with a version beyond v1</p>
-  </div>
-  <div class="metric">
-    <p class="metric-label">Snapshots stored</p>
-    <p class="metric-value">{{ snapshots|num }}</p>
-    <p class="metric-note">Rows in regulation_versions</p>
-  </div>
-  <div class="metric">
-    <p class="metric-label">Latest capture</p>
-    <p class="metric-value metric-value-sm">{% if latest_snapshot %}{{ latest_snapshot|dt }}{% else %}—{% endif %}</p>
-    <p class="metric-note">Most recent version row</p>
-  </div>
+  <p class="lede">Stored version history for every document, with line-level diffs when a re-crawl finds new text.</p>
 </section>
 
-{% if changes %}
-<p class="notice notice-info">{{ changes|num }} document{% if changes != 1 %}s{% endif %} have more than one stored version. Select one below to compare the latest two snapshots.</p>
-{% else %}
-<p class="notice notice-info"><strong>No version-to-version changes are recorded.</strong> Every stored snapshot is version 1, so the pipeline has captured initial publication but no subsequent revision. The <span class="mono">diff_summary</span> column is empty for all rows; this dashboard does not fabricate a summary.</p>
+<section class="statline">
+  <span class="statpair"><strong>{{ snapshots|num }}</strong> snapshots saved</span>
+  <span class="sep">·</span>
+  <span class="statpair"><strong>{{ changes|num }}</strong> second versions recorded</span>
+</section>
+
+{% if changes == 0 %}
+<section class="callout callout-info">
+  <p>All stored snapshots are currently version&nbsp;1. Re-crawl a document to capture version&nbsp;2; any text difference will appear here as a line-by-line diff.</p>
+</section>
 {% endif %}
 
-{% if detail %}
-{% if detail.missing %}
-{{ empty_state(
-  "Document not found",
-  "No regulation exists with that identifier. It may have been removed from the database.",
-  "/changes", "Back to change activity"
-) }}
-{% else %}
-<section class="panel" aria-labelledby="document-history">
-  <div class="panel-head">
-    <h2 id="document-history">Selected document</h2>
-    <a class="panel-link" href="/changes">← All change activity</a>
-  </div>
-  <div class="doc-head">
-    <h3>{{ detail.doc.title }}</h3>
-    <p class="doc-meta">
-      <span>{{ detail.doc.regulator }}</span>
-      <span>{{ detail.doc.legal_type|replace('_', ' ')|capitalize }}</span>
-      <span>First seen {{ detail.doc.first_seen_at|dt }}</span>
-      <span>Last checked {{ detail.doc.last_checked_at|dt }}</span>
-    </p>
-    <p class="doc-hash">Normalized content hash
-      <span class="mono" title="{{ detail.doc.content_hash }}">{{ detail.doc.content_hash|short_hash(24) }}</span>
-    </p>
-    <p class="doc-actions">
-      <a class="btn" href="{{ detail.doc.url }}" target="_blank" rel="noopener noreferrer">Open source document<span aria-hidden="true"> ↗</span></a>
-    </p>
-  </div>
-
-  {% if detail.versions %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Stored versions for this document</caption>
-      <thead>
-        <tr>
-          <th scope="col">Version</th>
-          <th scope="col">Captured</th>
-          <th scope="col" class="num">Characters</th>
-          <th scope="col">Raw SHA-256</th>
-          <th scope="col">Stored summary</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for version in detail.versions %}
-        <tr>
-          <td class="nowrap mono">v{{ version.version_no }}</td>
-          <td class="nowrap"><time datetime="{{ version.created_at }}">{{ version.created_at|dt }}</time></td>
-          <td class="num">{{ version.chars|num }}</td>
-          <td class="mono" title="{{ version.raw_sha256 }}">{{ version.raw_sha256|short_hash(16) }}</td>
-          <td class="muted">{{ version.diff_summary or "—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="table-note">Raw SHA-256 is the hash stored on the version row. The normalized content hash above belongs to the regulation row and is what the change-detection step compares.</p>
-  {% endif %}
-
-  {% if detail.versions|length < 2 %}
-  <p class="notice panel-notice">Only one snapshot exists for this document, so there is no earlier text to compare. A diff appears here after the pipeline stores a second version.</p>
-  {% else %}
-  <div class="diff-block">
-    <div class="diff-head">
-      <h4>Line comparison</h4>
-      {% if detail.diff and not detail.diff.too_large %}
-      <p class="diff-stats"><span class="diff-add-stat">+{{ detail.diff.added }}</span> <span class="diff-del-stat">−{{ detail.diff.removed }}</span> lines</p>
-      {% endif %}
-    </div>
-    {% if detail.diff is none %}
-    <p class="notice panel-notice">Both snapshots are stored without readable text, so no diff could be produced.</p>
-    {% elif detail.diff.too_large %}
-    <p class="notice panel-notice">The snapshots are too large to compare in the browser. Use the version hashes above to confirm they differ.</p>
-    {% elif detail.diff.identical %}
-    <p class="notice panel-notice">The two most recent snapshots contain identical text.</p>
+<div class="changes-grid">
+  <section class="panel">
+    <h2>Pick a document</h2>
+    <p class="panel-sub">Most recently captured versions — opening one shows its stored history.</p>
+    {% if recent_versions %}
+    <ul class="picklist">
+      {% for v in recent_versions %}
+      <li>
+        <a href="/changes?regulation={{ v.regulation_id }}" class="{{ 'pick-on' if detail and detail.doc is defined and detail.doc.id == v.regulation_id }}">
+          <span class="pick-title">{{ v.title|truncate(52) }}</span>
+          <span class="pick-meta">v{{ v.version_no }} · {{ v.created_at|date }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
     {% else %}
-    <pre class="diff-body" aria-label="Line diff between the two most recent versions">{% for line in detail.diff.lines %}{% set cls = 'meta' if line.startswith('+++') or line.startswith('---') else ('hunk' if line.startswith('@@') else ('add' if line.startswith('+') else ('del' if line.startswith('-') else 'ctx'))) %}<span class="diff-line diff-{{ cls }}">{{ line }}</span>
-{% endfor %}</pre>
-    {% if detail.diff.truncated %}<p class="table-note">Diff truncated to the first {{ detail.diff.lines|length }} lines.</p>{% endif %}
+    <p class="empty-note">No snapshots yet — nothing to compare.</p>
     {% endif %}
-  </div>
-  {% endif %}
+  </section>
 
-  <p class="notice panel-notice notice-muted">Review status is not stored in the database, so this dashboard does not show an approval or review workflow.</p>
-</section>
-{% endif %}
-{% endif %}
+  <section class="panel detail-panel">
+    {% if detail and not detail.missing %}
+      <h2>Version history</h2>
+      <p class="detail-title">{{ detail.doc.title }}</p>
+      <p class="detail-meta">
+        {{ detail.doc.regulator or 'Unknown issuer' }} · {{ detail.doc.legal_type|replace('_', ' ')|title }}
+        {% if detail.doc.content_hash %} · fingerprint {{ detail.doc.content_hash|short_hash(10) }}{% endif %}
+      </p>
 
-<section class="panel" aria-labelledby="snapshot-list">
-  <div class="panel-head">
-    <h2 id="snapshot-list">Latest snapshots</h2>
-    <span class="panel-count">{{ recent_versions|length }} shown</span>
-  </div>
-  {% if recent_versions %}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Most recent document snapshots</caption>
-      <thead>
-        <tr>
-          <th scope="col">Document</th>
-          <th scope="col">Version</th>
-          <th scope="col">Captured</th>
-          <th scope="col">Raw SHA-256</th>
-          <th scope="col">Review</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for version in recent_versions %}
-        <tr>
-          <td class="cell-title">
-            <a href="/changes?regulation={{ version.regulation_id }}">{{ version.title }}</a>
-            {% if version.diff_summary %}<span class="cell-sub">{{ version.diff_summary }}</span>{% endif %}
-          </td>
-          <td class="nowrap mono">v{{ version.version_no }}</td>
-          <td class="nowrap"><time datetime="{{ version.created_at }}">{{ version.created_at|dt }}</time></td>
-          <td class="mono" title="{{ version.raw_sha256 }}">{{ version.raw_sha256|short_hash(16) }}</td>
-          <td class="nowrap">
-            <a href="/changes?regulation={{ version.regulation_id }}">Inspect</a>
-            {% if version.url %}
-            · <a class="source-link" href="{{ version.url }}" target="_blank" rel="noopener noreferrer">Source<span aria-hidden="true"> ↗</span></a>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  {{ empty_state(
-    "No snapshots recorded",
-    "Version rows appear after the worker captures document content. The dashboard does not show sample change events."
-  ) }}
-  {% endif %}
-</section>
+      <div class="tablewrap">
+      <table class="data slim">
+        <thead>
+          <tr>
+            <th scope="col">Version</th>
+            <th scope="col">Captured</th>
+            <th scope="col">Size</th>
+            <th scope="col">Fingerprint</th>
+            <th scope="col">Stored summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in detail.versions %}
+          <tr>
+            <td><strong>v{{ v.version_no }}</strong></td>
+            <td class="nowrap">{{ v.created_at|dt }}</td>
+            <td>{{ v.chars|num }} chars</td>
+            <td class="mono muted">{{ v.raw_sha256|short_hash(10) }}</td>
+            <td class="muted">{{ v.diff_summary or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+
+      {% if detail.diff and not detail.diff.too_large %}
+        {% if detail.diff.identical %}
+          <p class="verdict-note"><strong class="tone-ok">No text change:</strong> both versions captured the exact same words.</p>
+        {% else %}
+        <div class="diffcard">
+          <p class="diffstat">
+            <span class="add">+{{ detail.diff.added }} lines added</span>
+            <span class="del">−{{ detail.diff.removed }} lines removed</span>
+          </p>
+          <pre class="diff"><code>{% for line in detail.diff.lines %}{{ line ~ "\n" }}{% endfor %}</code></pre>
+          {% if detail.diff.truncated %}<p class="muted small">Diff compacted to the first 160 lines.</p>{% endif %}
+        </div>
+        {% endif %}
+      {% elif detail.diff and detail.diff.too_large %}
+        <p class="verdict-note muted">Both versions exist but are too large to diff in the browser — fingerprints above match, so the watcher saw no change.</p>
+      {% elif detail.versions|length >= 2 %}
+        <p class="verdict-note muted">Two versions are stored, but their full text wasn't saved, so a side-by-side diff isn't possible — fingerprints and sizes above are the record.</p>
+      {% else %}
+        <p class="verdict-note"><strong class="tone-info">One version so far.</strong> Next time this document is re-checked, version&nbsp;2 arrives and any change gets compared line by line right here.</p>
+      {% endif %}
+
+      {% if detail.doc.url %}
+      <a class="btn ghost" href="{{ detail.doc.url }}" target="_blank" rel="noopener">Open the original on the issuer's site ↗</a>
+      {% endif %}
+
+    {% elif detail and detail.missing %}
+      <div class="bigempty">
+        <p class="bigempty-title">That document isn't in the database</p>
+        <p>Pick one from the list on the left.</p>
+      </div>
+    {% else %}
+      <div class="bigempty soft">
+        <p class="bigempty-title">Choose a document</p>
+        <p>Pick one from the list to see its versions. A diff appears automatically when two readable versions exist.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

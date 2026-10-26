@@ -10,11 +10,10 @@ import difflib
 import logging
 import math
 import re
-from collections import Counter
 from datetime import datetime
 from functools import lru_cache
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from zoneinfo import ZoneInfo
 
 from regwatch.settings import get_settings
@@ -218,6 +217,14 @@ def pct(part: Any, total: Any) -> int:
         return round(int(part) * 100 / total_int) if total_int else 0
     except (TypeError, ValueError):
         return 0
+
+
+def qs(base: dict[str, Any] | None = None, **extra: Any) -> str:
+    """Build an encoded query string, skipping empty values (for filter links)."""
+    merged = dict(base or {})
+    merged.update(extra)
+    clean = {k: v for k, v in merged.items() if v not in ("", None)}
+    return urlencode(clean)
 
 
 def fmt_conf(value: Any) -> str:
@@ -441,6 +448,7 @@ def search_documents(
         "filters": filters,
         "legal_types": LEGAL_TYPES,
         "snapshot_labels": SNAPSHOT_LABELS,
+        "sorts": DOC_SORTS,
         "has_filters": bool(term or legal_type or snapshot),
     }
 

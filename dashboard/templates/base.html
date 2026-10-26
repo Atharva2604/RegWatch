@@ -3,42 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}RegWatch — Regulatory operations{% endblock %}</title>
-  <meta name="description" content="RegWatch regulatory operations dashboard: monitored SEBI instruments, document changes, and compliance assessments.">
-  <link rel="stylesheet" href="/static/app.css">
+  <title>{% block title %}RegWatch{% endblock %}</title>
+  <link rel="stylesheet" href="/static/simple.css">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+<a class="skip" href="#content">Skip to content</a>
 
-  <header class="masthead">
-    <div class="masthead-inner">
-      <a class="wordmark" href="/">RegWatch<span class="wordmark-mark">.</span></a>
-      <div class="masthead-meta">
-        {% if db_ok %}
-        <span class="status"><span class="dot" aria-hidden="true"></span>Supabase connected</span>
-        {% else %}
-        <span class="status status-down"><span class="dot" aria-hidden="true"></span>Data source offline</span>
-        {% endif %}
-        <span>Read-only</span>
-      </div>
-    </div>
-    <nav class="main-nav" aria-label="Primary">
-      <ul class="tabs">
-        <li><a href="/"{% if active == 'overview' %} aria-current="page"{% endif %}>Overview</a></li>
-        <li><a href="/documents"{% if active == 'documents' %} aria-current="page"{% endif %}>Documents</a></li>
-        <li><a href="/changes"{% if active == 'changes' %} aria-current="page"{% endif %}>Change review</a></li>
-        <li><a href="/compliance"{% if active == 'compliance' %} aria-current="page"{% endif %}>Compliance &amp; risk</a></li>
-      </ul>
+<header class="masthead">
+  <div class="shell masthead-in">
+    <a class="logo" href="/">Reg<span>Watch</span></a>
+    <nav class="top-nav" aria-label="Pages">
+      <a href="/" aria-current="{{ 'page' if active == 'overview' else 'false' }}">Overview</a>
+      <a href="/documents" aria-current="{{ 'page' if active == 'documents' else 'false' }}">Documents</a>
+      <a href="/changes" aria-current="{{ 'page' if active == 'changes' else 'false' }}">Changes</a>
+      <a href="/compliance" aria-current="{{ 'page' if active == 'compliance' else 'false' }}">Compliance</a>
     </nav>
-  </header>
+  </div>
+</header>
 
-  <main id="main" class="page">
-    {% block content %}{% endblock %}
-  </main>
+<main class="shell" id="content">
+{% block content %}{% endblock %}
+</main>
 
-  <footer class="site-foot">
-    <p>RegWatch regulatory operations · Proof of concept</p>
-    <p>Queried server-side from Supabase · Times shown in IST · No alert messages are delivered</p>
-  </footer>
+<footer class="footer">
+  <div class="shell footer-in">
+    <span>Read-only · live Supabase data</span>
+    <span>Times in IST · rendered {{ rendered_at|dt }}</span>
+  </div>
+</footer>
 </body>
 </html>

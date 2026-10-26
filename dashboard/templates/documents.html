@@ -1,113 +1,104 @@
 {% extends "base.html" %}
-{% from "_macros.html" import sort_th, snapshot_chip, empty_state %}
-{% block title %}Documents · RegWatch{% endblock %}
+{% block title %}RegWatch — Documents{% endblock %}
 
 {% block content %}
-<header class="page-head">
-  <p class="eyebrow">Regulatory library</p>
-  <h1>Documents</h1>
-  <p class="dek">Every regulatory instrument the ingestion pipeline has recorded. Search and filters run against the Supabase regulations table; each row links to its stored change history and its original source.</p>
-</header>
-
-<form class="filter-bar" method="get" action="/documents" role="search" aria-label="Filter documents">
-  <div class="field field-wide">
-    <label for="q">Search documents</label>
-    <input type="search" id="q" name="q" value="{{ filters.q }}" placeholder="Title, reference number or department" autocomplete="off">
-  </div>
-  <div class="field">
-    <label for="type">Legal type</label>
-    <select id="type" name="type">
-      <option value="">All types</option>
-      {% for value, label in legal_types.items() %}
-      <option value="{{ value }}"{% if filters.type == value %} selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="field">
-    <label for="snapshot">Snapshot state</label>
-    <select id="snapshot" name="snapshot">
-      <option value="">Any state</option>
-      {% for value, label in snapshot_labels.items() %}
-      <option value="{{ value }}"{% if filters.snapshot == value %} selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="filter-actions">
-    <button class="btn btn-primary" type="submit">Apply filters</button>
-    {% if has_filters %}<a class="btn" href="{{ clear_url }}">Clear</a>{% endif %}
-  </div>
-  <input type="hidden" name="sort" value="{{ filters.sort }}">
-  <input type="hidden" name="dir" value="{{ filters.dir }}">
-</form>
-
-<div class="results-meta">
-  <p><strong>{{ total|num }}</strong> document{% if total != 1 %}s{% endif %}{% if has_filters %} match these filters{% endif %}</p>
-  <p class="muted">Sorted by {{ sort_options[filters.sort] }}, {{ 'ascending' if filters.dir == 'asc' else 'descending' }}</p>
-</div>
-
-{% if rows %}
-<section class="panel panel-table" aria-labelledby="documents-table">
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Tracked regulatory documents. Column headers marked with an arrow sort the table.</caption>
-      <thead>
-        <tr>
-          {{ sort_th('Document', 'title', sort_links, filters.sort, filters.dir) }}
-          <th scope="col">Regulator</th>
-          {{ sort_th('Type', 'legal_type', sort_links, filters.sort, filters.dir, 'nowrap') }}
-          {{ sort_th('Published', 'published_date', sort_links, filters.sort, filters.dir, 'nowrap') }}
-          {{ sort_th('Last checked', 'last_checked_at', sort_links, filters.sort, filters.dir, 'nowrap') }}
-          <th scope="col">Snapshot</th>
-          <th scope="col">Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td class="cell-title">
-            <a href="/changes?regulation={{ row.id }}">{{ row.title }}</a>
-            {% if row.reference_number %}<span class="cell-sub">{{ row.reference_number }}</span>{% endif %}
-          </td>
-          <td class="nowrap">{{ row.regulator }}</td>
-          <td class="nowrap">{{ legal_types.get(row.legal_type, row.legal_type) }}</td>
-          <td class="nowrap muted">{{ row.published_date|date }}</td>
-          <td class="nowrap">
-            {% if row.last_checked_at %}<time datetime="{{ row.last_checked_at }}">{{ row.last_checked_at|date }}</time>{% else %}—{% endif %}
-          </td>
-          <td>{{ snapshot_chip(row.has_snapshot) }}</td>
-          <td class="nowrap">
-            <a class="source-link" href="{{ row.url }}" target="_blank" rel="noopener noreferrer">Source<span aria-hidden="true"> ↗</span></a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <p class="table-note">Publication dates and reference numbers are not populated by the current SEBI adapter, so those cells read “—”. “Snapshot” means at least one document version is stored; open a document to inspect it.</p>
+<section class="page-head">
+  <h1>Document library</h1>
+  <p class="lede">Every regulation we watch. Search by title, number or department.</p>
 </section>
 
-{% if pages > 1 %}
-<nav class="pager" aria-label="Pagination">
-  {% if prev_url %}
-  <a class="btn" href="{{ prev_url }}" rel="prev">← Previous</a>
-  {% else %}
-  <span class="btn btn-disabled" aria-disabled="true">← Previous</span>
-  {% endif %}
-  <p class="pager-info">Page {{ page }} of {{ pages }} · {{ total|num }} results</p>
-  {% if next_url %}
-  <a class="btn" href="{{ next_url }}" rel="next">Next →</a>
-  {% else %}
-  <span class="btn btn-disabled" aria-disabled="true">Next →</span>
-  {% endif %}
+<form class="filterbar" method="get" action="/documents">
+  <label class="field grow">
+    <span>Search</span>
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="e.g. mutual fund">
+  </label>
+  <label class="field">
+    <span>Type</span>
+    <select name="type">
+      <option value="">Any type</option>
+      {% for value, label in legal_types.items() %}
+      <option value="{{ value }}" {{ 'selected' if filters.type == value }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>Snapshot</span>
+    <select name="snapshot">
+      <option value="">Any state</option>
+      {% for value, label in snapshot_labels.items() %}
+      <option value="{{ value }}" {{ 'selected' if filters.snapshot == value }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>Sort by</span>
+    <select name="sort">
+      {% for value, label in sorts.items() %}
+      <option value="{{ value }}" {{ 'selected' if filters.sort == value }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">
+    <span>Order</span>
+    <select name="dir">
+      <option value="desc" {{ 'selected' if filters.dir == 'desc' }}>Newest first</option>
+      <option value="asc" {{ 'selected' if filters.dir == 'asc' }}>Oldest first</option>
+    </select>
+  </label>
+  <button class="btn" type="submit">Show results</button>
+  {% if has_filters %}<a class="btn ghost" href="/documents">Clear</a>{% endif %}
+</form>
+
+{% if total %}
+<p class="result-note"><strong>{{ total|num }}</strong> documents match. Page {{ page }} of {{ pages }}.</p>
+
+<div class="tablewrap">
+<table class="data">
+  <thead>
+    <tr>
+      <th scope="col">Document</th>
+      <th scope="col">Type</th>
+      <th scope="col">Who issued it</th>
+      <th scope="col">Published</th>
+      <th scope="col">Last checked</th>
+      <th scope="col">Saved copy</th>
+      <th scope="col"><span class="visually-hidden">Source link</span>↗</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <th scope="row">
+        <a class="doclink" href="/changes?regulation={{ row.id }}">{{ row.title|truncate(70) }}</a>
+        {% if row.reference_number %}<span class="muted small">{{ row.reference_number }}</span>{% endif %}
+      </th>
+      <td>{{ legal_types.get(row.legal_type, row.legal_type|replace('_', ' ')|title) }}</td>
+      <td>{{ row.regulator or 'Unknown' }}</td>
+      <td class="nowrap muted">{{ row.published_date|date }}</td>
+      <td class="nowrap muted">{{ row.last_checked_at|dt }}</td>
+      <td>
+        {% if row.has_snapshot %}<span class="vchip v-ok">Captured</span>
+        {% else %}<span class="vchip v-mute">Pending</span>{% endif %}
+      </td>
+      <td>
+        {% if row.url %}<a class="srclink" href="{{ row.url }}" target="_blank" rel="noopener">Source</a>{% else %}<span class="muted">—</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<nav class="pager" aria-label="Pages">
+  {% if page > 1 %}<a class="btn" href="/documents?{{ qs(filters, page=page - 1) }}">← Previous</a>{% endif %}
+  <span class="pageno">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a class="btn" href="/documents?{{ qs(filters, page=page + 1) }}">Next →</a>{% endif %}
 </nav>
-{% endif %}
 
 {% else %}
-{{ empty_state(
-  "No documents match these filters" if has_filters else "No documents recorded yet",
-  "Try a shorter search term or remove the legal-type and snapshot filters." if has_filters else "The regulations table is empty. Run the ingestion and worker commands to populate it; this dashboard does not generate sample records.",
-  clear_url if has_filters else None,
-  "Clear filters" if has_filters else None
-) }}
+<div class="bigempty">
+  <p class="bigempty-title">No documents match</p>
+  <p>Try a shorter search word{% if has_filters %}, or <a href="/documents">clear the filters</a>{% endif %}.</p>
+</div>
 {% endif %}
 {% endblock %}

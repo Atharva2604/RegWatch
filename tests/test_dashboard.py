@@ -12,6 +12,12 @@ def test_fmt_dt_converts_utc_to_ist():
     assert data.fmt_dt("2026-10-24T07:04:17.155632+00:00") == "24 Oct 2026, 12:34 IST"
 
 
+def test_qs_builds_filter_links_and_skips_empty_values():
+    assert data.qs({"q": "credit", "type": "circular"}, page=2) == "q=credit&type=circular&page=2"
+    assert data.qs({"q": "", "type": "circular", "page": 3}) == "type=circular&page=3"
+    assert data.qs(None, verdict="non_compliant") == "verdict=non_compliant"
+
+
 def test_text_diff_reports_changed_lines():
     diff = data.text_diff("alpha\nbeta\ngamma", "alpha\nBETA\ngamma")
     assert diff is not None

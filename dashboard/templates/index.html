@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}RegWatch — Overview{% endblock %}
+
+{% block content %}
+<section class="page-head">
+  <h1>Operations overview</h1>
+  <p class="lede">Live monitoring, compliance verdicts and risk signals across the regulatory watchlist.</p>
+</section>
+
+<section class="kpis">
+  <div class="kpi">
+    <h3>Documents tracked</h3>
+    <p class="kpi-n">{{ documents|num }}</p>
+    <span class="meter"><span style="width: {{ pct(with_snapshot, documents) }}%"></span></span>
+    <p class="sub">{{ pct(with_snapshot, documents) }}% with a saved snapshot</p>
+  </div>
+  <div class="kpi">
+    <h3>Snapshots stored</h3>
+    <p class="kpi-n">{{ snapshots|num }}</p>
+    <p class="sub">captured full-text copies</p>
+  </div>
+  <div class="kpi {{ 'attention' if changes }}">
+    <h3>Changes detected</h3>
+    <p class="kpi-n">{{ changes|num }}</p>
+    <p class="sub">second versions recorded</p>
+  </div>
+  <div class="kpi {{ 'attention' if verdict_counts.non_compliant }}">
+    <h3>Non-compliant checks</h3>
+    <p class="kpi-n">{{ verdict_counts.non_compliant|num }}</p>
+    <p class="sub">of {{ checks_total|num }} assessments</p>
+  </div>
+  <div class="kpi">
+    <h3>Risks scored</h3>
+    <p class="kpi-n">{{ risk_total|num }}</p>
+    <p class="sub">{{ jobs_pending|num }} queued · {{ jobs_failed|num }} failed jobs</p>
+  </div>
+</section>
+
+<section class="duo">
+  <section class="panel">
+    <h2>Verdict distribution</h2>
+    <p class="panel-sub">{{ checks_total|num }} compliance assessments on record</p>
+    <ul class="score">
+      {% set labels = [
+        ('compliant', 'Following rules', 'ok'),
+        ('non_compliant', 'Breaking rules', 'bad'),
+        ('needs_review', 'Pending review', 'warn'),
+        ('no_policy', 'No policy to compare', 'mute')
+      ] %}
+      {% for verdict, label, tone in labels %}
+      <li>
+        <a class="score-row" href="/compliance?verdict={{ verdict }}">
+          <span class="score-label tone-{{ tone }}">{{ verdict_labels[verdict] }} <small>{{ label }}</small></span>
+          <span class="meter"><span class="bar-{{ tone }}" style="width: {{ pct(verdict_counts[verdict], checks_total) }}%"></span></span>
+          <span class="score-n">{{ verdict_counts[verdict]|num }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Latest activity</h2>
+    <div class="rail-cols">
+      <div>
+        <h3>Snapshots captured</h3>
+        {% if recent_versions %}
+        <ul class="activity">
+          {% for v in recent_versions[:5] %}
+          <li>
+            <a href="/changes?regulation={{ v.regulation_id }}">{{ v.title|truncate(42) }}</a>
+            <span class="muted">v{{ v.version_no }} · {{ v.created_at|date }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="empty-note">Nothing captured yet.</p>{% endif %}
+      </div>
+      <div>
+        <h3>Recent verdicts</h3>
+        {% if recent_checks %}
+        <ul class="activity">
+          {% for c in recent_checks %}
+          <li>
+            <a href="/compliance?verdict={{ c.verdict }}">
+              <span class="vchip v-{{ 'ok' if c.verdict == 'compliant' else 'bad' if c.verdict == 'non_compliant' else 'warn' if c.verdict == 'needs_review' else 'mute' }}">{{ verdict_labels[c.verdict] }}</span>
+              {{ c.company_name|truncate(28) }}
+            </a>
+            <span class="muted">{{ c.created_at|date }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}<p class="empty-note">No runs recorded yet.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}
